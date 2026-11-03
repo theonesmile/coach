@@ -1,0 +1,109 @@
+# Commute Coach 음성 만들기
+# 앱이 requests/ 에 문장 목록을 올리면, edge-tts로 MP3를 만들어 outputs/ 에 저장합니다.
+name: tts
+
+on:
+  push:
+    paths: ['requests/**']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: tts
+  cancel-in-progress: false
+
+jobs:
+  tts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      # 요청을 올린 시점이 아니라 지금 최신 상태를 받음 (이미 처리된 요청을 또 만들지 않게)
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.ref }}
+
+      - name: Install edge-tts
+        run: python3 -m venv ~/tts && ~/tts/bin/pip install --quiet --upgrade edge-tts
+
+      - name: Make audio
+        run: |
+          ~/tts/bin/python - <<'EOF'
+          import asyncio, base64, json, pathlib, time
+          import edge_tts
+
+          REQ, OUT = pathlib.Path('requests'), pathlib.Path('outputs')
+          OUT.mkdir(exist_ok=True)
+          now = time.time()
+          for f in OUT.glob('*.json'):                      # 앱이 받아간 결과는 3일 뒤 정리
+              try:
+                  if now - json.loads(f.read_text('utf-8')).get('done', 0) > 3 * 86400:
+                      f.unlink()
+              except Exception:
+                  f.unlink()
+
+          async def synth(text, voice, rate):
+              err = RuntimeError('empty audio')
+              for attempt in range(4):
+                  try:
+                      buf = bytearray()
+                      async for ch in edge_tts.Communicate(text, voice, rate=rate).stream():
+                          if ch['type'] == 'audio':
+                              buf += ch['data']
+                      if buf:
+                          return bytes(buf)
+                      err = RuntimeError('empty audio')
+                  except Exception as e:
+                      err = e
+                  await asyncio.sleep(1.5 * (attempt + 1))
+              raise err
+
+          async def main():
+              sem = asyncio.Semaphore(4)
+              for req in sorted(REQ.glob('*.json')):
+                  rid = req.stem
+                  clips, errors = {}, {}
+                  try:
+                      items = json.loads(req.read_text('utf-8'))['items'][:600]
+                  except Exception as e:
+                      items, errors['*'] = [], f'bad request: {e}'
+
+                  async def one(it):
+                      async with sem:
+                          voice, rate = it['voice'], it.get('rate', '+0%')
+                          try:
+                              data = await synth(it['text'], voice, rate)
+                          except Exception as e:
+                              if voice.startswith('en-') and voice != 'en-US-JennyNeural':
+                                  try:
+                                      data = await synth(it['text'], 'en-US-JennyNeural', rate)
+                                  except Exception as e2:
+                                      errors[it['k']] = f'{type(e2).__name__}: {e2}'[:300]
+                                      return
+                              else:
+                                  errors[it['k']] = f'{type(e).__name__}: {e}'[:300]
+                                  return
+                          clips[it['k']] = base64.b64encode(data).decode()
+
+                  await asyncio.gather(*(one(it) for it in items))
+                  (OUT / f'{rid}.json').write_text(json.dumps({'id': rid, 'clips': clips, 'errors': errors, 'done': time.time()}))
+                  req.unlink()
+                  print(f'{rid}: {len(clips)} ok, {len(errors)} failed')
+
+          asyncio.run(main())
+          EOF
+
+      - name: Save results
+        run: |
+          git config user.name "coach-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -q -m "음성 생성"
+          for i in 1 2 3 4 5; do
+            git pull -q --rebase && git push -q && exit 0
+            git rebase --abort 2>/dev/null || true
+            sleep $((i * 3))
+          done
+          exit 1

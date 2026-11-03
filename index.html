@@ -1,0 +1,1433 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#102B3F">
+<meta name="apple-mobile-web-app-title" content="Coach">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="apple-touch-icon" href="./icon.png">
+<link rel="icon" href="./icon.png">
+<title>Commute Coach</title>
+<style>
+:root{
+  --sans:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Pretendard","Noto Sans KR","Malgun Gothic",sans-serif;
+  --serif:ui-serif,"New York","Iowan Old Style",Georgia,"Times New Roman",serif;
+  --bg:#EEF2F4; --surface:#FFFFFF; --ink:#102B3F; --muted:#5A7080; --line:#D5DFE5;
+  --deck:#102B3F; --deck-ink:#F1F6F8; --deck-muted:#9DB4C1; --road:#2B4A61;
+  --teal:#27C4A7; --teal-ink:#05352D; --amber:#F5B841; --danger:#B83A26;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --bg:#08131B; --surface:#0F1E29; --ink:#E2ECF1; --muted:#8CA3B1; --line:#1E3242;
+    --deck:#0F2636; --deck-ink:#F1F6F8; --deck-muted:#94ACBA; --road:#294559;
+    --danger:#E0664F; color-scheme:dark;
+  }
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 var(--sans);-webkit-font-smoothing:antialiased}
+button,input,textarea{font:inherit;color:inherit}
+button{cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+.app{max-width:560px;margin:0 auto;padding:calc(10px + env(safe-area-inset-top)) 16px calc(48px + env(safe-area-inset-bottom))}
+
+/* 머리 */
+.top{display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding:8px 2px 14px}
+.top h1{font-size:17px;line-height:1.2;margin:0;font-weight:700;letter-spacing:-.01em}
+.stats{margin:0;font-size:13px;color:var(--muted);text-align:right}
+
+/* 플레이어 */
+.deck{background:var(--deck);color:var(--deck-ink);border-radius:26px;padding:20px 20px 14px}
+.status{margin:0;font-size:13px;line-height:20px;color:var(--deck-muted);min-height:20px}
+.now{min-height:118px;padding:12px 0 4px}
+.now-en{font-family:var(--serif);font-size:29px;line-height:1.18;font-weight:600;margin:0;letter-spacing:-.01em;overflow-wrap:anywhere}
+.now-ko{margin:10px 0 0;font-size:15px;line-height:1.45;color:var(--deck-muted);min-height:22px;overflow-wrap:anywhere}
+.meter{height:6px;border-radius:3px;background:var(--road);overflow:hidden;margin:16px 0 0}
+.meter i{display:block;height:100%;width:0;background:var(--teal);transition:width .4s}
+
+/* 세션 경로: 세트마다 정류장, 노란 점이 현재 위치 */
+.route{position:relative;height:30px;margin:14px 7px 2px}
+.route .track,.route .fill{position:absolute;left:0;top:50%;height:4px;margin-top:-2px;border-radius:2px}
+.route .track{right:0;background:var(--road)}
+.route .fill{width:0;background:var(--teal)}
+.route .stop{position:absolute;top:50%;width:12px;height:12px;margin:-6px 0 0 -6px;border-radius:50%;background:var(--deck);border:2px solid var(--road)}
+.route .stop.done{background:var(--teal);border-color:var(--teal)}
+.route .car{position:absolute;top:50%;left:0;width:18px;height:18px;margin:-9px 0 0 -9px;border-radius:50%;background:var(--amber);box-shadow:0 0 0 5px rgba(245,184,65,.22)}
+.route input{position:absolute;inset:0;width:100%;height:100%;margin:0;opacity:0;cursor:pointer}
+.route:has(input:focus-visible){outline:2px solid var(--amber);outline-offset:6px;border-radius:8px}
+.times{display:flex;justify-content:space-between;font-size:12px;color:var(--deck-muted);font-variant-numeric:tabular-nums;padding:0 2px}
+.controls{display:flex;align-items:center;justify-content:center;gap:30px;margin:10px 0 6px}
+.play{width:86px;height:86px;border-radius:50%;border:0;background:var(--teal);color:var(--teal-ink);display:grid;place-items:center}
+.play svg{width:40px;height:40px;fill:currentColor}
+.ctl{width:58px;height:58px;border-radius:50%;border:0;background:transparent;color:var(--deck-ink);display:grid;place-items:center}
+.ctl svg{width:28px;height:28px;fill:currentColor}
+.play:disabled,.ctl:disabled{opacity:.3;cursor:default}
+.deck-foot{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:8px;padding-top:10px;border-top:1px solid var(--road)}
+.deck-foot a,.deck-foot button{min-height:44px;display:inline-flex;align-items:center;padding:0 2px;background:none;border:0;color:var(--deck-ink);font-size:14px;font-weight:600;text-decoration:none}
+.deck-foot [aria-disabled=true],.deck-foot button:disabled{opacity:.35;pointer-events:none}
+.retry{margin-top:12px;min-height:44px;padding:0 16px;border-radius:12px;border:1px solid var(--deck-muted);background:none;color:var(--deck-ink);font-weight:600}
+
+/* 섹션 */
+.sec{margin-top:26px;padding-top:18px;border-top:1px solid var(--line)}
+.sec h2,.sec summary{font-size:15px;font-weight:700;margin:0;line-height:1.3}
+.sec h2{margin-bottom:12px}
+details.sec summary{list-style:none;display:flex;align-items:center;justify-content:space-between;min-height:44px;cursor:pointer}
+details.sec summary::-webkit-details-marker{display:none}
+details.sec summary::after{content:"";width:8px;height:8px;margin-right:6px;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);transform:rotate(45deg);transition:transform .2s}
+details.sec[open] summary::after{transform:rotate(-135deg)}
+summary .count{color:var(--muted);font-weight:500;margin-left:6px}
+.hint{margin:0 0 10px;color:var(--muted);font-size:14px}
+
+/* 이번 세션 */
+.sets{list-style:none;margin:0;padding:0}
+.sets>li{padding:6px 0 10px}
+.set-name{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;color:var(--muted);margin-bottom:4px}
+.set-name .tick{color:var(--teal);font-size:13px}
+.items{list-style:none;margin:0;padding:0}
+.items li{display:grid;grid-template-columns:1fr auto;align-items:baseline;column-gap:10px;padding:6px 0}
+.items .ko{grid-column:1}
+.en{font-family:var(--serif);font-weight:600;font-size:17px;line-height:1.3;overflow-wrap:anywhere}
+.ko{color:var(--muted);font-size:14px;line-height:1.45}
+.tag{grid-column:2;grid-row:1;font-style:normal;font-size:11px;font-weight:700;line-height:18px;padding:0 7px;border-radius:9px;background:var(--amber);color:#3A2600;white-space:nowrap}
+
+/* 추가 */
+.steps{margin:0;padding:0;list-style:none;counter-reset:s}
+.steps>li{counter-increment:s;position:relative;padding:0 0 18px 34px}
+.steps>li::before{content:counter(s);position:absolute;left:0;top:1px;width:24px;height:24px;border-radius:50%;background:var(--ink);color:var(--bg);font-size:13px;font-weight:700;display:grid;place-items:center}
+.steps p{margin:0 0 10px;font-size:14px;line-height:1.5}
+textarea{width:100%;min-height:120px;resize:vertical;border:1px solid var(--line);border-radius:12px;background:var(--surface);padding:12px;font-size:16px;line-height:1.4}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:10px}
+.btn{min-height:44px;padding:0 18px;border-radius:12px;border:1px solid var(--line);background:var(--surface);font-weight:600;font-size:15px}
+.btn.primary{background:var(--ink);border-color:var(--ink);color:var(--bg)}
+.btn:disabled{opacity:.5}
+.file{font-size:14px;color:var(--muted);text-decoration:underline;text-underline-offset:3px;cursor:pointer;min-height:44px;display:inline-flex;align-items:center;padding:0 4px}
+.prompt-box{margin-top:10px}
+.prompt-box textarea{min-height:160px;font-size:13px}
+
+/* 보관함 */
+.lib{list-style:none;margin:6px 0 0;padding:0}
+.lib li{display:grid;grid-template-columns:1fr auto;column-gap:12px;padding:12px 0;border-bottom:1px solid var(--line)}
+.lib li:last-child{border-bottom:0}
+.lib .meta{font-size:12px;color:var(--muted);margin-top:2px}
+.lib .del{grid-column:2;grid-row:1/span 3;align-self:center;min-height:40px;padding:0 12px;border-radius:10px;border:1px solid var(--line);background:none;font-size:13px;font-weight:600;color:var(--muted)}
+.lib .del.armed{background:var(--danger);border-color:var(--danger);color:#fff}
+
+/* 설정 */
+.field{margin:16px 0 0}
+.field>span{display:block;font-size:14px;font-weight:600;margin-bottom:8px}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{min-width:46px;min-height:42px;padding:0 11px;border-radius:21px;border:1px solid var(--line);background:none;font-weight:600;font-size:15px;font-variant-numeric:tabular-nums}
+.chip[aria-pressed=true]{background:var(--ink);border-color:var(--ink);color:var(--bg)}
+.slider{display:block;margin:14px 0 0}
+.slider>span{display:flex;justify-content:space-between;font-size:14px}
+.slider b{font-variant-numeric:tabular-nums}
+.slider input{width:100%;margin:8px 0 0;accent-color:var(--teal);min-height:28px}
+.input{display:block;margin:10px 0 0}
+.input>span{display:block;font-size:13px;color:var(--muted);margin-bottom:4px}
+.input input{width:100%;min-height:44px;border:1px solid var(--line);border-radius:12px;background:var(--surface);padding:0 12px;font-size:16px}
+.voice-state{font-size:14px;margin:0 0 4px}
+.voice-state.ok{color:var(--teal)}
+
+/* 알림 */
+.toast{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom));transform:translate(-50%,16px);width:max-content;max-width:calc(100% - 32px);background:var(--ink);color:var(--bg);padding:12px 16px;border-radius:14px;font-size:14px;line-height:1.45;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:9}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+.toast.err{background:var(--danger);color:#fff}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<main class="app">
+  <header class="top">
+    <h1>Commute Coach</h1>
+    <p class="stats" id="stats"></p>
+  </header>
+
+  <section class="deck" aria-label="플레이어">
+    <p class="status" id="status" aria-live="polite">불러오는 중</p>
+    <div class="now">
+      <p class="now-en" id="nowEn"></p>
+      <p class="now-ko" id="nowKo"></p>
+      <div class="meter" id="meter" hidden><i id="meterFill"></i></div>
+      <button class="retry" id="retry" hidden>다시 시도</button>
+      <button class="retry" id="openVoice" hidden>GitHub 연결하기</button>
+    </div>
+    <div class="route" id="route" hidden>
+      <div class="track"></div><div class="fill" id="fill"></div>
+      <div id="stops"></div><div class="car" id="car"></div>
+      <input type="range" id="seek" min="0" max="1" step="0.1" value="0" aria-label="재생 위치">
+    </div>
+    <div class="times" hidden><span id="cur">0:00</span><span id="dur">0:00</span></div>
+    <div class="controls">
+      <button class="ctl" id="prev" aria-label="이전 문제" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5h2.2v14H6zM19 5.6v12.8L9.4 12z"/></svg></button>
+      <button class="play" id="play" aria-label="재생" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path id="playIcon" d="M8.5 5.5v13L19 12z"/></svg></button>
+      <button class="ctl" id="next" aria-label="다음 문제" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15.8 5H18v14h-2.2zM5 5.6v12.8L14.6 12z"/></svg></button>
+    </div>
+    <div class="deck-foot">
+      <a id="save" href="#" aria-disabled="true">MP3 저장</a>
+      <button id="newSession" disabled>새 세션 만들기</button>
+    </div>
+  </section>
+
+  <section class="sec" id="sessionSec">
+    <h2>이번 세션</h2>
+    <ol class="sets" id="sets"></ol>
+  </section>
+
+  <section class="sec">
+    <h2>수업 내용 추가</h2>
+    <ol class="steps">
+      <li>
+        <p>프롬프트를 복사해 Claude에 붙여넣고 수업 녹취를 첨부하세요. Claude 프로젝트 지침에 한 번 넣어두면 다음부터는 녹취만 첨부하면 돼요.</p>
+        <button class="btn" id="copyPrompt">프롬프트 복사</button>
+        <div class="prompt-box" id="promptBox" hidden>
+          <p class="hint">자동 복사가 안 되면 아래 내용을 길게 눌러 전체 선택 후 복사하세요.</p>
+          <textarea id="promptText" readonly></textarea>
+        </div>
+      </li>
+      <li>
+        <p>Claude 답변 맨 아래의 JSON을 복사해 붙여넣으세요. 피드백까지 통째로 붙여넣어도 JSON만 골라 읽어요.</p>
+        <textarea id="jsonIn" placeholder="여기에 붙여넣기" autocapitalize="off" autocomplete="off" autocorrect="off" spellcheck="false"></textarea>
+        <div class="row">
+          <button class="btn primary" id="addBtn">청크 추가</button>
+          <label class="file">파일에서 가져오기<input type="file" id="fileIn" accept=".json,.txt,application/json,text/plain" hidden></label>
+        </div>
+      </li>
+    </ol>
+  </section>
+
+  <details class="sec" id="libSec">
+    <summary><span>청크 보관함<span class="count" id="libCount"></span></span></summary>
+    <ul class="lib" id="lib"></ul>
+  </details>
+
+  <details class="sec" id="setSec">
+    <summary>설정</summary>
+    <div class="field" id="voiceField">
+      <span>음성 만들기 (GitHub)</span>
+      <p class="voice-state" id="voiceState"></p>
+      <p class="hint">비공개 저장소 coach-data의 이름과, 그 저장소 전용 토큰을 넣으세요. 토큰은 이 아이폰에만 저장돼요.</p>
+      <label class="input"><span>저장소</span><input id="ghRepo" type="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="아이디/coach-data"></label>
+      <label class="input"><span>토큰</span><input id="ghToken" type="password" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="github_pat_로 시작하는 토큰"></label>
+      <div class="row"><button class="btn primary" id="ghSave">저장하고 확인</button></div>
+    </div>
+    <div class="field"><span>세션 길이 (분)</span><div class="chips" id="lenChips"></div></div>
+    <div class="field"><span>영어 속도</span><div class="chips" id="rateChips"></div></div>
+    <div class="field"><span>생각할 시간 (초)</span><div id="pauseSliders"></div></div>
+    <div class="row" style="margin-top:18px">
+      <button class="btn" id="resetSettings">기본값으로</button>
+      <button class="btn" id="backup">백업 파일 받기</button>
+    </div>
+    <p class="hint" style="margin-top:12px" id="backupHint"></p>
+  </details>
+</main>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<audio id="audio" preload="auto" playsinline></audio>
+
+<script>
+'use strict';
+
+/* ───────── 기본값 ───────── */
+const ROUND_SIZE = 4;                                // 한 세트의 최대 청크 수
+const INTERVALS = [0, 1, 2, 4, 7, 15, 30, 60];       // n번 들은 뒤 다음 복습까지(일)
+const DEFAULTS = { minutes: 20, rate: 1, repeatPause: 3, patternPause: 5, outputPause: 15, answerPause: 3 };
+const LENGTHS = [10, 15, 20, 30, 40, 60];
+const RATES = [0.8, 0.9, 1, 1.1, 1.2];
+const PAUSES = [
+  ['repeatPause', '새 표현 따라 말하기', 2, 6],
+  ['patternPause', '한국어 듣고 영어로 말하기', 3, 10],
+  ['outputPause', '질문에 자유롭게 답하기', 5, 30],
+  ['answerPause', '정답 듣고 따라 하기', 2, 8],
+];
+const ORD = ['첫', '두', '세', '네', '다섯', '여섯', '일곱', '여덟', '아홉', '열', '열한', '열두', '열세', '열네', '열다섯'];
+const K_STATE = 'cec3-state', K_POS = 'cec3-pos', K_GH = 'cec3-github', K_DIRTY = 'cec3-dirty', K_PENDING = 'cec3-pending';
+const NO_NET = '인터넷에 연결되어 있지 않아 새 음성을 만들 수 없어요. 이미 만든 세션은 그대로 들을 수 있어요.';
+const NO_SETUP = 'GitHub 연결을 먼저 설정해 주세요. 처음 한 번만 하면 돼요.';
+
+// 목소리 — ko: 한국어 안내·문제 / en: 영어 정답·예문 / q: 자유 발화 질문(인터뷰어)
+const VOICES = { ko: 'ko-KR-SunHiNeural', en: 'en-US-JennyNeural', q: 'en-US-GuyNeural' };
+const SR = 24000;                                    // edge-tts MP3: 24kHz 모노
+const MIN_GAP = 0.35;                                // 세션에서 문장 사이 최소 간격(초)
+const GH_API = 'https://api.github.com';
+
+const SAMPLES = [
+  { chunk: 'I tend to ~', meaning_ko: '저는 ~하는 편이에요', category: '습관', corrected_expression: 'I tend to stay home on weekends.',
+    examples: ['I tend to avoid crowded places.', 'I tend to plan my week on Sunday night.', 'I tend to get nervous when I speak English.'],
+    prompts: ['저는 붐비는 곳을 피하는 편이에요.', '저는 일요일 밤에 한 주 계획을 세우는 편이에요.', '저는 영어로 말할 때 긴장하는 편이에요.'],
+    question: 'What do you usually do on weekends?',
+    answer: 'I tend to stay home on weekends. I catch up on sleep, and if the weather is nice, I go for a long walk.' },
+  { chunk: 'What I mean is ~', meaning_ko: '제 말은 ~라는 거예요', category: '명확화',
+    examples: ['What I mean is that we need more time.', 'What I mean is that it depends on the situation.', 'What I mean is that we should start small.'],
+    prompts: ['제 말은 시간이 더 필요하다는 거예요.', '제 말은 상황에 따라 다르다는 거예요.', '제 말은 작게 시작해야 한다는 거예요.'],
+    question: 'Could you explain your opinion a little more?',
+    answer: 'Sure. What I mean is that the idea is good, but we need more time to test it before we launch.' },
+  { chunk: 'It depends on ~', meaning_ko: '~에 따라 달라요', category: '의견',
+    examples: ['It depends on the weather.', 'It depends on my schedule.', "It depends on the customer's needs."],
+    prompts: ['날씨에 따라 달라요.', '제 일정에 따라 달라요.', '고객 요구에 따라 달라요.'],
+    question: 'Do you prefer working alone or in a team?',
+    answer: 'It depends on the task. For creative work I like a team, but when I need to focus, I prefer working alone.' },
+  { chunk: 'The main challenge is ~', meaning_ko: '가장 큰 어려움은 ~예요', category: '상황 설명',
+    examples: ['The main challenge is communication.', 'The main challenge is finding enough time.', 'The main challenge is meeting the deadline.'],
+    prompts: ['가장 큰 어려움은 소통이에요.', '가장 큰 어려움은 충분한 시간을 내는 거예요.', '가장 큰 어려움은 마감을 맞추는 거예요.'],
+    question: 'What is the most difficult part of your job?',
+    answer: 'The main challenge is coordinating with many teams. Everyone has different priorities, so I spend a lot of time aligning them.' },
+];
+
+/* ───────── 작은 도구 ───────── */
+const $ = (s) => document.querySelector(s);
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const pad = (n) => String(n).padStart(2, '0');
+const fmtDate = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const todayStr = () => fmtDate(new Date());
+const addDays = (s, n) => { const d = new Date(`${s}T00:00:00`); d.setDate(d.getDate() + n); return fmtDate(d); };
+const uid = (p) => p + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+const str = (v) => (typeof v === 'string' ? v.trim() : typeof v === 'number' ? String(v) : '');
+const arr = (v) => (Array.isArray(v) ? v : typeof v === 'string' && v.trim() ? [v] : []);
+const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+const normKey = (s) => { const k = String(s).toLowerCase().replace(/[^a-z0-9]/g, ''); return k || String(s).trim(); };
+const hasHangul = (s) => /[가-힣]/.test(s);
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const xmlEsc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;' }[c]));
+const mmss = (t) => { t = Math.max(0, Math.round(t || 0)); return `${Math.floor(t / 60)}:${pad(t % 60)}`; };
+const lsGet = (k) => { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } };
+const lsSet = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* 저장 공간 없음 */ } };
+const shortDate = (s) => { const [, m, d] = s.split('-'); return `${Number(m)}월 ${Number(d)}일`; };
+const fail = (message, kind) => Object.assign(new Error(message), { kind });
+function hash53(s) {
+  let h1 = 0xdeadbeef, h2 = 0x41c6ce57;
+  for (let i = 0; i < s.length; i++) { const ch = s.charCodeAt(i); h1 = Math.imul(h1 ^ ch, 2654435761); h2 = Math.imul(h2 ^ ch, 1597334677); }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(36);
+}
+
+let S = null;            // 학습 상태 (청크, 기록, 설정, 세션)
+let TL = null;           // 현재 MP3의 타임라인
+let PROMPT = '';
+let renderToken = 0;
+let ui = { phase: 'loading', done: 0, total: 0, error: '', kind: '', wait: 0 };
+let pendingSeek = null, lastPosSave = 0, lastCid = undefined, iconUrl = './icon.png';
+const audio = $('#audio');
+
+/* ───────── 청크 정리 ───────── */
+function normalizeChunk(r) {
+  if (!r || typeof r !== 'object') return null;
+  const chunk = str(r.chunk || r.pattern || r.expression);
+  const meaning = str(r.meaning_ko || r.meaning || r.korean);
+  if (!chunk || !meaning) return null;
+  const corrected = str(r.corrected_expression || r.corrected);
+  let examples = arr(r.examples || r.example_sentences).map(str);
+  let prompts = arr(r.prompts || r.practice_questions || r.korean_prompts).map(str);
+  if (!examples.some(Boolean)) examples = [corrected || chunk];
+  const keep = examples.map((e, i) => (e ? i : -1)).filter((i) => i >= 0).slice(0, 3);
+  examples = keep.map((i) => examples[i]);
+  prompts = keep.map((i) => prompts[i] || '');
+  let q = r.question ?? arr(r.questions || r.spontaneous_questions)[0];
+  let answer = r.answer || r.sample_answer || r.model_answer || arr(r.sample_answers)[0];
+  if (q && typeof q === 'object') { answer = answer || q.answer || q.sample_answer; q = q.question || q.q; }
+  const c = {
+    id: str(r.id) || uid('c'), chunk, meaning_ko: meaning,
+    original_expression: str(r.original_expression || r.original), corrected_expression: corrected,
+    examples, prompts, question: str(q), answer: str(answer),
+    category: str(r.category) || '기타', topic: str(r.topic), lesson_date: str(r.lesson_date || r.date),
+    priority: clamp(Number(r.priority) || 5, 1, 10), added: str(r.added) || todayStr(),
+  };
+  if (r.sample) c.sample = true;
+  return c;
+}
+
+function freshState() {
+  return { version: 3, updatedAt: 0, chunks: SAMPLES.map((s, i) => normalizeChunk({ ...s, id: `sample-v3-${i + 1}`, sample: true, lesson_date: '' })),
+    progress: {}, deleted: {}, settings: { ...DEFAULTS }, settingsAt: 0, session: null, sessionAt: 0, lastBackup: '' };
+}
+
+function normalizeState(st) {
+  const s = st && typeof st === 'object' ? st : freshState();
+  const obj = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : {});
+  s.version = 3;
+  s.chunks = arr(s.chunks).map(normalizeChunk).filter(Boolean);
+  s.progress = obj(s.progress);
+  s.deleted = obj(s.deleted);
+  const set = { ...DEFAULTS, ...(s.settings || {}) };
+  for (const k of Object.keys(DEFAULTS)) if (typeof set[k] !== 'number' || !isFinite(set[k])) set[k] = DEFAULTS[k];
+  s.settings = set;
+  if (s.session && !Array.isArray(s.session.rounds)) s.session = null;
+  for (const k of ['updatedAt', 'settingsAt', 'sessionAt']) s[k] = Number(s[k]) || 0;
+  s.lastBackup = str(s.lastBackup);
+  return s;
+}
+
+/* ───────── 저장 (이 기기 + GitHub 자동 백업) ───────── */
+let syncTimer = null;
+function save() {
+  S.updatedAt = Date.now();
+  lsSet(K_STATE, S);
+  lsSet(K_DIRTY, true);
+  clearTimeout(syncTimer);
+  syncTimer = setTimeout(() => syncState(), 4000);
+}
+function loadState() {
+  S = normalizeState(lsGet(K_STATE) || freshState());
+  lsSet(K_STATE, S);
+}
+
+// 두 기기의 상태 합치기 (순서와 상관없이 같은 결과)
+//  · 청크 · 들은 기록 · 지운 기록: 합집합 → 어느 기기에서 추가해도 사라지지 않음
+//  · 설정 · 세션: 나중에 바꾼 쪽 (같은 세션이면 들은 세트를 합침)
+const canon = (v) => JSON.stringify(v, (k, x) => (x && typeof x === 'object' && !Array.isArray(x)
+  ? Object.keys(x).sort().reduce((o, key) => { o[key] = x[key]; return o; }, {}) : x));
+const progRank = (p) => [p.n || 0, p.due ? 1 : 0, p.last || ''];
+function laterProgress(p, q) {
+  const a = progRank(p), b = progRank(q);
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return a[i] > b[i];
+  return false;
+}
+function mergeStates(a, b) {
+  const later = (k) => ((a[k] || 0) >= (b[k] || 0) ? a : b);
+  const setSrc = later('settingsAt'), sesSrc = later('sessionAt'), sesOther = sesSrc === a ? b : a;
+  const deleted = { ...(a.deleted || {}), ...(b.deleted || {}) };
+  const chunks = [], ids = new Set(), keys = new Set();
+  for (const c of [...arr(a.chunks), ...arr(b.chunks)]) {
+    if (!c || deleted[c.id] || ids.has(c.id) || keys.has(normKey(c.chunk))) continue;
+    chunks.push(c); ids.add(c.id); keys.add(normKey(c.chunk));
+  }
+  chunks.sort((x, y) => (x.added || '').localeCompare(y.added || '') || (x.id < y.id ? -1 : x.id > y.id ? 1 : 0));
+  const progress = {};
+  for (const src of [a.progress || {}, b.progress || {}]) {
+    for (const [id, p] of Object.entries(src)) {
+      if (p && !deleted[id] && (!progress[id] || laterProgress(p, progress[id]))) progress[id] = p;
+    }
+  }
+  const session = sesSrc.session ? JSON.parse(JSON.stringify(sesSrc.session)) : null;
+  if (session && sesOther.session && session.id === sesOther.session.id) {
+    session.credited = [...new Set([...(session.credited || []), ...(sesOther.session.credited || [])])];
+    session.completed = !!(session.completed || sesOther.session.completed);
+  }
+  return { version: 3, updatedAt: Math.max(a.updatedAt || 0, b.updatedAt || 0), chunks, progress, deleted,
+    settings: { ...(setSrc.settings || {}) }, settingsAt: setSrc.settingsAt || 0, session, sessionAt: sesSrc.sessionAt || 0,
+    lastBackup: [a.lastBackup || '', b.lastBackup || ''].sort().pop() };
+}
+// 다른 기기에서 바뀐 내용을 지금 화면에 반영
+function mergeIntoLocal(remote) {
+  const snap = () => canon([S.chunks, S.progress, S.settings, S.session && S.session.id, S.session && S.session.credited]);
+  const before = snap(), prevSid = S.session && S.session.id, prevSettings = JSON.stringify(S.settings);
+  const merged = normalizeState(mergeStates(S, normalizeState(remote)));
+  if (TL && !audio.paused && S.session && merged.session && merged.session.id !== S.session.id) {
+    merged.session = S.session; merged.sessionAt = S.sessionAt;          // 재생 중에는 듣던 세션 유지
+  }
+  S = merged;
+  lsSet(K_STATE, S);
+  if (snap() === before) return;
+  if ((S.session && S.session.id) !== prevSid) { renderAll(); prepareAudio(false); return; }
+  renderStats(); renderSession(); renderLibrary(); renderSettings();
+  if (JSON.stringify(S.settings) !== prevSettings) prepareAudio(true);
+}
+
+/* ───────── 가져오기 ───────── */
+// 답변 전체를 붙여넣어도 JSON만 골라냅니다 (```json 블록 → {"chunks" 위치 → 첫 괄호 순)
+const BOM = String.fromCharCode(0xFEFF);
+const SMART_QUOTES = new RegExp('[' + String.fromCharCode(0x201C, 0x201D) + ']', 'g');
+function balancedFrom(s, start) {
+  let depth = 0, inStr = false, escaped = false;
+  for (let i = start; i < s.length; i++) {
+    const ch = s[i];
+    if (inStr) { if (escaped) escaped = false; else if (ch === '\\') escaped = true; else if (ch === '"') inStr = false; continue; }
+    if (ch === '"') inStr = true;
+    else if (ch === '{' || ch === '[') depth++;
+    else if ((ch === '}' || ch === ']') && --depth === 0) return s.slice(start, i + 1);
+  }
+  return s.slice(start);
+}
+function parseLoose(text) {
+  let s = String(text || '').split(BOM).join('').trim();
+  if (!s) throw new Error('붙여넣은 내용이 없어요.');
+  const blocks = [...s.matchAll(/```[a-zA-Z]*\s*([\s\S]*?)```/g)].map((m) => m[1]).filter((b) => /[[{]/.test(b));
+  if (blocks.length) s = blocks.reverse().find((b) => b.includes('"chunks"')) || blocks[0];
+  let at = s.search(/\{\s*"chunks"\s*:/);
+  if (at < 0) at = s.search(/[[{]/);
+  if (at < 0) throw new Error('JSON을 찾지 못했어요. Claude 답변 맨 아래의 JSON을 복사해 주세요.');
+  const raw = balancedFrom(s, at);
+  try { return JSON.parse(raw); } catch (e1) {
+    try { return JSON.parse(raw.replace(SMART_QUOTES, '"').replace(/,\s*([}\]])/g, '$1')); }
+    catch { throw new Error(`JSON 형식이 맞지 않아요 (${e1.message}). 답변 맨 아래 JSON이 끝까지 복사됐는지 확인해 주세요.`); }
+  }
+}
+
+function importData(data) {
+  let rows, progIn = null;
+  if (Array.isArray(data)) rows = data;
+  else if (data && Array.isArray(data.chunks)) {
+    rows = data.chunks;
+    if (data.progress && typeof data.progress === 'object') progIn = data.progress;          // v2·v3 백업, PC의 coach.json
+    else if (data.history && typeof data.history === 'object') {                           // v1.3 백업
+      progIn = {};
+      for (const [id, n] of Object.entries(data.history)) if (n > 0) progIn[id] = { n, last: '' };
+    }
+  } else if (data && data.chunk) rows = [data];
+  else throw new Error('"chunks" 목록이 없어요. 프롬프트 형식대로 만든 JSON인지 확인해 주세요.');
+
+  const parsed = [], skipped = [];
+  rows.forEach((r, i) => { const c = normalizeChunk(r); if (c) parsed.push({ c, oldId: str(r && r.id) }); else skipped.push(i + 1); });
+  if (!parsed.length) throw new Error('chunk와 meaning_ko가 있는 항목이 하나도 없어요.');
+
+  if (S.chunks.every((c) => c.sample)) {                       // 첫 가져오기 때 샘플은 정리
+    for (const c of S.chunks) { delete S.progress[c.id]; S.deleted[c.id] = todayStr(); }
+    S.chunks = [];
+  }
+  const byKey = new Map(S.chunks.map((c) => [normKey(c.chunk), c]));
+  const ids = new Set(S.chunks.map((c) => c.id));
+  let added = 0, again = 0;
+  for (const { c, oldId } of parsed) {
+    const ex = byKey.get(normKey(c.chunk));
+    const p = progIn && oldId ? progIn[oldId] : null;
+    if (!ex) {
+      if (ids.has(c.id) || S.deleted[c.id]) c.id = uid('c');
+      S.chunks.push(c); byKey.set(normKey(c.chunk), c); ids.add(c.id); added++;
+      if (p && p.n > 0) S.progress[c.id] = { n: p.n, last: str(p.last) };
+    } else if (progIn) {
+      const q = S.progress[ex.id];
+      if (p && p.n > ((q && q.n) || 0)) S.progress[ex.id] = { n: p.n, last: str(p.last) };
+    } else {
+      // 새 수업에 또 나온 표현 → 내용 보충하고 바로 복습 차례로
+      if (!ex.answer && c.answer) ex.answer = c.answer;
+      if (!ex.question && c.question) ex.question = c.question;
+      const q = S.progress[ex.id];
+      if (q && q.n) { q.due = true; again++; }
+    }
+  }
+  const parts = [];
+  if (added) parts.push(`새 청크 ${added}개를 추가했어요.`);
+  if (again) parts.push(`이미 있던 ${again}개는 바로 복습하도록 앞으로 당겼어요.`);
+  if (!added && !again) parts.push(progIn ? '백업을 합쳤어요. 새로 추가된 청크는 없어요.' : '모두 이미 있는 청크예요.');
+  if (skipped.length) parts.push(`${skipped.length}개는 chunk·meaning_ko가 없어 건너뛰었어요.`);
+  return { message: parts.join(' '), changed: added > 0 || again > 0 || !!progIn };
+}
+
+function runImport(text) {
+  try {
+    const res = importData(parseLoose(text));
+    $('#jsonIn').value = '';
+    if (res.changed) { save(); newSession(); window.scrollTo({ top: 0, behavior: 'smooth' }); }
+    renderAll();
+    toast(res.message);
+  } catch (e) { toast(e.message, true); }
+}
+
+/* ───────── 복습 스케줄 & 세션 구성 ───────── */
+const prog = (c) => S.progress[c.id];
+const dueDate = (p) => (!p || !p.last || p.due ? '0000-00-00' : addDays(p.last, INTERVALS[Math.min(p.n, INTERVALS.length - 1)]));
+const byId = (id) => S.chunks.find((c) => c.id === id);
+const modelSentence = (c) => (c.corrected_expression && normKey(c.corrected_expression) !== normKey(c.chunk) ? c.corrected_expression : c.examples[0]);
+const sampleAnswer = (c) => c.answer || c.examples.slice(1).join(' ') || c.examples[0];
+// 필드가 뒤바뀐 JSON도 엉뚱한 목소리로 읽지 않도록
+const voiceFor = (t, v) => (v !== 'ko' && hasHangul(t) ? 'ko' : v === 'ko' && !hasHangul(t) && /[A-Za-z]/.test(t) ? 'en' : v);
+
+function drillPairs(c, fresh, seen) {
+  const pairs = c.examples.map((en, j) => [c.prompts[j], en]).filter(([ko, en]) => ko && en);
+  if (!pairs.length) return [[c.meaning_ko, modelSentence(c)]];
+  if (fresh || pairs.length <= 2) return pairs;
+  const k = (seen || 0) % pairs.length;               // 복습 때는 2문제씩 돌아가며
+  return [pairs[k], pairs[(k + 1) % pairs.length]];
+}
+
+// 한 청크의 4단계: A 새 표현 듣기 / B 한→영 / C 자유 발화 / D 마무리 복습
+function chunkParts(c, fresh, seen) {
+  const st = S.settings;
+  const seg = (t, v, p) => ({ t, v: voiceFor(t, v), p, cid: c.id });
+  const model = modelSentence(c);
+  const A = fresh ? [[seg(c.chunk, 'en', st.repeatPause), seg(c.meaning_ko, 'ko', 0.8),
+    ...(normKey(model) !== normKey(c.chunk) ? [seg(model, 'en', st.repeatPause)] : [])]] : [];
+  const B = drillPairs(c, fresh, seen).map(([ko, en]) => [seg(ko, 'ko', st.patternPause), seg(en, 'en', st.answerPause)]);
+  const C = c.question ? [[seg(c.question, 'q', st.outputPause), seg('예시 답변.', 'ko', 0.3), seg(sampleAnswer(c), 'en', st.answerPause)]] : [];
+  const D = [[seg(c.meaning_ko, 'ko', st.patternPause), seg(c.chunk, 'en', st.answerPause)]];
+  return { A, B, C, D };
+}
+
+const estSpeech = (t, v) => 0.45 + (v === 'ko' ? (t.match(/[가-힣]/g) || []).length / 6.2 : t.trim().split(/\s+/).length / 2.6 / S.settings.rate);
+const estSecs = (segs) => segs.reduce((sum, s) => sum + Math.max(s.p, MIN_GAP) + estSpeech(s.t, s.v), 0);
+function estChunk(c, fresh) { const P = chunkParts(c, fresh, (prog(c) || {}).n); return estSecs([...P.A, ...P.B, ...P.C, ...P.D].flat()); }
+
+function buildPlan() {
+  const today = todayStr(), target = S.settings.minutes * 60;
+  const g = { fresh: [], due: [], later: [], today: [] };
+  for (const c of S.chunks) {
+    const p = prog(c);
+    if (!p || !p.n) g.fresh.push(c);
+    else if (p.due) g.due.push(c);
+    else if (p.last === today) g.today.push(c);
+    else if (dueDate(p) <= today) g.due.push(c);
+    else g.later.push(c);
+  }
+  const recent = (c) => c.lesson_date || c.added || '';
+  g.fresh.sort((a, b) => recent(b).localeCompare(recent(a)) || b.priority - a.priority);
+  g.due.sort((a, b) => dueDate(prog(a)).localeCompare(dueDate(prog(b))) || b.priority - a.priority);
+  g.later.sort((a, b) => dueDate(prog(a)).localeCompare(dueDate(prog(b))) || b.priority - a.priority);
+  g.today.sort((a, b) => prog(a).n - prog(b).n);
+
+  const picked = [];
+  let t = 10;
+  const fits = (c, fresh) => { const e = estChunk(c, fresh) + (picked.length % ROUND_SIZE === 0 ? 15 : 0); return { ok: !picked.length || t + e / 2 <= target, e }; };
+  const take = (c, fresh) => { const { ok, e } = fits(c, fresh); if (ok) { picked.push({ c, fresh }); t += e; } return ok; };
+  const freshQ = [...g.fresh];
+  while (freshQ.length && t < target * 0.6 && take(freshQ[0], true)) freshQ.shift();     // 새 청크는 세션의 60%까지 먼저
+  const queue = [...g.due.map((c) => [c, false]), ...freshQ.map((c) => [c, true]), ...g.later.map((c) => [c, false]), ...g.today.map((c) => [c, false])];
+  for (const [c, fresh] of queue) if (!take(c, fresh)) break;
+
+  const nRounds = Math.ceil(picked.length / ROUND_SIZE);
+  const size = nRounds ? Math.ceil(picked.length / nRounds) : 0;
+  const rounds = [];
+  for (let i = 0; i < picked.length; i += size) rounds.push(picked.slice(i, i + size).map((x) => x.c.id));
+  const seen = {};
+  for (const x of picked) seen[x.c.id] = (prog(x.c) || {}).n || 0;
+  return { id: uid('s'), created: today, minutes: S.settings.minutes, rounds, fresh: picked.filter((x) => x.fresh).map((x) => x.c.id),
+    seen, credited: [], completed: false };
+}
+
+const ordinal = (r) => `${ORD[r] || r + 1} 번째`;
+
+// 세션 대본: 세트마다 A→B→C→D. item = 이전/다음 버튼이 이동하는 단위
+function buildScript(plan) {
+  const segs = [];
+  let item = 0;
+  const push = (items, round) => { for (const it of items) { for (const s of it) segs.push({ ...s, round, item }); item++; } };
+  const cue = (t, round) => push([[{ t, v: 'ko', p: 0.8, cue: true }]], round);
+  const rounds = plan.rounds.map((ids) => ids.map(byId).filter(Boolean));
+  cue('오늘의 영어 청크 연습을 시작합니다.', 0);
+  rounds.forEach((cs, r) => {
+    if (!cs.length) return;
+    const parts = cs.map((c) => chunkParts(c, plan.fresh.includes(c.id), (plan.seen || {})[c.id]));
+    if (rounds.length > 1) cue(`${ordinal(r)} 세트입니다.`, r);
+    if (parts.some((p) => p.A.length)) { cue('새 표현입니다. 듣고 따라 하세요.', r); parts.forEach((p) => push(p.A, r)); }
+    cue('한국어를 듣고 영어로 말해 보세요.', r); parts.forEach((p) => push(p.B, r));
+    if (parts.some((p) => p.C.length)) { cue('질문에 영어로 답해 보세요.', r); parts.forEach((p) => push(p.C, r)); }
+    cue('마무리 복습입니다. 뜻을 듣고 표현을 말해 보세요.', r); [...parts].reverse().forEach((p) => push(p.D, r));
+  });
+  push([[{ t: '오늘 세션을 모두 마쳤습니다. 수고하셨어요!', v: 'ko', p: 0, cue: true }]], plan.rounds.length);
+  return segs;
+}
+
+function sessionUsable(plan) { return plan && plan.rounds.length && plan.rounds.some((ids) => ids.some(byId)); }
+
+function newSession() {
+  S.session = buildPlan();
+  S.sessionAt = Date.now();
+  save();
+  lsSet(K_POS, null);
+  renderAll();
+  prepareAudio(false);
+}
+
+/* ───────── 음성 문장 만들기: GitHub Actions에서 edge-tts로 ───────── */
+// 표기를 읽기 좋은 문장으로 (예: 'I tend to ~' → 'I tend to', '저는 ~하는' → '저는 뭐뭐하는')
+function speakable(text, kind) {
+  let s = String(text).replace(/[～〜]/g, '~');
+  if (kind === 'ko') s = s.replace(/~/g, '뭐뭐').replace(/\//g, ', ');
+  else {
+    s = s.replace(/\s*~\s*/g, ' … ')
+      .replace(/\bsb\b/g, 'somebody').replace(/\bsth\b/g, 'something')
+      .replace(/([A-Za-z])\s*\/\s*(?=[A-Za-z])/g, '$1 or ')
+      .replace(/\s*…\s*([?.!,])/g, '$1')
+      .replace(/^\s*…\s*|\s*…\s*$/g, '');
+  }
+  s = s.replace(/\s+/g, ' ').trim();
+  return s || String(text).trim();
+}
+const rateStr = (rate, kind) => { const p = Math.round((rate - 1) * 100); return kind === 'ko' ? '+0%' : `${p >= 0 ? '+' : ''}${p}%`; };
+
+const ghGet = () => { const g = lsGet(K_GH); return g && g.repo && g.token ? g : null; };
+function b64encode(text) {
+  const bytes = new TextEncoder().encode(text);
+  let bin = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+  return btoa(bin);
+}
+function b64bytes(b64) {
+  const bin = atob(String(b64).replace(/\s/g, ''));
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+
+// GitHub API (coach-data 저장소). 없는 파일이면 null
+async function gh(path, { method = 'GET', body, raw = false, cfg = ghGet() } = {}) {
+  if (!cfg) throw fail(NO_SETUP, 'setup');
+  let r;
+  try {
+    r = await fetch(`${GH_API}/repos/${cfg.repo}${path}`, {
+      method, cache: 'no-store',
+      headers: {
+        Authorization: `Bearer ${cfg.token}`,
+        Accept: raw ? 'application/vnd.github.raw+json' : 'application/vnd.github+json',
+        'X-GitHub-Api-Version': '2022-11-28',
+        ...(body ? { 'Content-Type': 'application/json' } : {}),
+      },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+  } catch {
+    throw fail(navigator.onLine ? 'GitHub에 연결하지 못했어요. 잠시 후 다시 시도해 주세요.' : NO_NET, 'net');
+  }
+  if (r.status === 404) return null;
+  if (r.ok) return raw ? r.text() : r.status === 204 ? {} : r.json();
+  let msg = '';
+  try { msg = (await r.json()).message || ''; } catch { /* 본문 없음 */ }
+  if (r.status === 401) throw fail('GitHub 토큰이 맞지 않거나 만료됐어요. 설정에서 토큰을 다시 넣어 주세요.', 'setup');
+  if (r.status === 409 || (r.status === 422 && /sha/i.test(msg))) throw fail('conflict', 'conflict');
+  if ((r.status === 403 || r.status === 429) && /rate limit/i.test(msg)) throw fail('GitHub 요청 한도에 걸렸어요. 잠시 후 다시 시도해 주세요.', 'net');
+  if (r.status === 403) throw fail(`토큰 권한이 부족해요 (${msg || '403'}). README의 토큰 권한을 확인해 주세요.`, 'perm');
+  throw fail(`GitHub 응답 ${r.status}${msg ? `: ${msg}` : ''}`, 'net');
+}
+
+// 요청 하나 = GitHub Actions 한 번. 앱을 닫았다 열어도 같은 요청을 이어서 기다림
+async function ghSynth(items, isLive, onStatus) {
+  const cfg = ghGet(), keys = items.map((s) => s.key);
+  let pend = lsGet(K_PENDING);
+  const reuse = pend && pend.repo === cfg.repo && Date.now() - pend.at < 15 * 60000 && keys.every((k) => pend.keys.includes(k));
+  if (!reuse) {
+    const rid = `${todayStr().replace(/-/g, '')}-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`;
+    const body = JSON.stringify({ v: 1, items: items.map((s) => ({ k: s.key, voice: VOICES[s.v], rate: s.rs, text: s.text })) });
+    onStatus('send', 0);
+    const res = await gh(`/contents/requests/${rid}.json`, { method: 'PUT', body: { message: `음성 요청 ${items.length}문장`, content: b64encode(body) } });
+    if (!res) throw fail('GitHub에 요청을 올리지 못했어요. 저장소 이름과 토큰 권한(Contents 쓰기)을 확인해 주세요.', 'setup');
+    pend ={ rid, sha: res && res.commit ? res.commit.sha : '', keys, at: Date.now(), repo: cfg.repo };
+    lsSet(K_PENDING, pend);
+  }
+  let step = 'queued', checked = 0, sawRun = false;
+  for (;;) {
+    if (!isLive()) throw fail('취소됨', 'stale');
+    const secs = Math.round((Date.now() - pend.at) / 1000);
+    onStatus(step, secs);
+    const out = await gh(`/contents/outputs/${pend.rid}.json`, { raw: true });
+    if (out) { lsSet(K_PENDING, null); return JSON.parse(out); }
+    if (pend.sha && Date.now() - checked > 8000) {
+      checked = Date.now();
+      try {
+        const runs = await gh(`/actions/runs?head_sha=${pend.sha}&per_page=5`);
+        const run = runs && runs.workflow_runs && runs.workflow_runs[0];
+        if (run) {
+          sawRun = true; step = run.status;
+          if (run.status === 'completed' && ['failure', 'timed_out', 'startup_failure'].includes(run.conclusion)) {
+            lsSet(K_PENDING, null);
+            throw fail('GitHub에서 음성 만들기가 실패했어요. coach-data 저장소의 Actions 탭에서 기록을 확인해 주세요.', 'gh');
+          }
+        } else if (!sawRun && secs > 90) {
+          const wf = await gh('/contents/.github/workflows');
+          if (!wf || !wf.length) { lsSet(K_PENDING, null); throw fail('coach-data 저장소에 음성 워크플로가 없어요. 설정에서 ‘저장하고 확인’을 다시 눌러 주세요.', 'setup'); }
+        }
+      } catch (e) { if (e.kind === 'gh' || e.kind === 'setup') throw e; /* Actions 읽기 권한이 없으면 건너뜀 */ }
+    }
+    if (secs > 12 * 60) { lsSet(K_PENDING, null); throw fail('GitHub 작업이 12분 넘게 끝나지 않아요. coach-data 저장소의 Actions 탭을 확인해 주세요.', 'gh'); }
+    await sleep(4000);
+  }
+}
+
+/* 만든 문장 보관 (IndexedDB) */
+let dbP = null;
+function db() {
+  if (!dbP) {
+    dbP = new Promise((resolve, reject) => {
+      const r = indexedDB.open('commute-coach', 1);
+      r.onupgradeneeded = () => r.result.createObjectStore('clips');
+      r.onsuccess = () => resolve(r.result);
+      r.onerror = () => reject(r.error);
+    });
+    dbP.catch(() => { dbP = null; });
+  }
+  return dbP;
+}
+async function clipsGet(keys) {
+  const d = await db();
+  return new Promise((resolve, reject) => {
+    const out = new Map(), tx = d.transaction('clips', 'readonly'), st = tx.objectStore('clips');
+    for (const k of keys) { const q = st.get(k); q.onsuccess = () => { if (q.result) out.set(k, q.result); }; }
+    tx.oncomplete = () => resolve(out);
+    tx.onerror = tx.onabort = () => reject(tx.error);
+  });
+}
+async function clipsPut(entries) {
+  const d = await db();
+  return new Promise((resolve, reject) => {
+    const tx = d.transaction('clips', 'readwrite'), st = tx.objectStore('clips');
+    for (const [k, v] of entries) st.put(v, k);
+    tx.oncomplete = () => resolve();
+    tx.onerror = tx.onabort = () => reject(tx.error);
+  });
+}
+async function clipsGc(days) {
+  const d = await db(), limit = Date.now() - days * 864e5;
+  return new Promise((resolve) => {
+    const tx = d.transaction('clips', 'readwrite');
+    tx.objectStore('clips').openCursor().onsuccess = (e) => {
+      const cur = e.target.result;
+      if (!cur) return;
+      if ((cur.value.used || 0) < limit) cur.delete();
+      cur.continue();
+    };
+    tx.oncomplete = tx.onerror = tx.onabort = () => resolve();
+  });
+}
+
+// 대본의 문장마다 보관함 키를 붙이고, 없는 문장만 GitHub에 요청해 채움
+function keyed(segs) {
+  const rate = S.settings.rate;
+  for (const s of segs) { s.text = speakable(s.t, s.v); s.rs = rateStr(rate, s.v); s.key = `${VOICES[s.v]}|${s.rs}|${s.text}`; }
+  return segs;
+}
+function uniqueMissing(segs, have) {
+  const seen = new Set(), out = [];
+  for (const s of segs) if (!have.has(s.key) && !seen.has(s.key)) { seen.add(s.key); out.push(s); }
+  return out;
+}
+// 지금 세션을 다 들었다고 치고 만든 다음 세션 대본
+function nextPreviewSegs() {
+  if (!S.session) return [];
+  const saved = S.progress, today = todayStr(), tmp = { ...saved };
+  for (const id of S.session.rounds.flat()) { const p = tmp[id]; tmp[id] = { n: p && p.n ? p.n + (p.last !== today ? 1 : 0) : 1, last: today }; }
+  S.progress = tmp;
+  try { return keyed(buildScript(buildPlan())); } finally { S.progress = saved; }
+}
+async function ensureClips(segs, extraSegs, isLive, onStatus) {
+  const keys = [...new Set(segs.map((s) => s.key))];
+  const have = await clipsGet(keys);
+  const missing = uniqueMissing(segs, have);
+  if (missing.length) {
+    if (!ghGet()) throw fail(NO_SETUP, 'setup');
+    if (!navigator.onLine) throw fail(NO_NET, 'net');
+    let items = missing;
+    if (extraSegs && extraSegs.length) {            // 다음 세션 문장도 같은 요청에 → 차 안에서 새 세션을 만들어도 바로 재생
+      const taken = new Set(missing.map((s) => s.key));
+      const extraKeys = [...new Set(extraSegs.map((s) => s.key))].filter((k) => !taken.has(k));
+      const extraHave = await clipsGet(extraKeys);
+      items = [...missing, ...uniqueMissing(extraSegs.filter((s) => !taken.has(s.key)), extraHave)].slice(0, 600);
+    }
+    const res = await ghSynth(items, isLive, onStatus);
+    const now = Date.now(), entries = [];
+    for (const it of items) { const b = res.clips && res.clips[it.key]; if (b) entries.push([it.key, { mp3: b64bytes(b).buffer, used: now }]); }
+    if (entries.length) await clipsPut(entries);
+    for (const [k, v] of entries) have.set(k, v);
+    const still = missing.filter((s) => !have.has(s.key));
+    if (still.length) {
+      const why = Object.values(res.errors || {})[0] || '';
+      throw fail(`${still.length}개 문장의 음성을 만들지 못했어요. 잠시 후 다시 시도해 주세요.${why ? ` (${String(why).slice(0, 80)})` : ''}`, 'gh');
+    }
+  }
+  const now = Date.now(), touch = keys.filter((k) => have.has(k) && (have.get(k).used || 0) < now - 864e5);
+  if (touch.length) clipsPut(touch.map((k) => [k, { ...have.get(k), used: now }])).catch(() => {});
+  return have;
+}
+
+/* MP3 이어 붙이기: 문장 MP3의 프레임을 그대로 잇고, 무음은 데이터가 0인 프레임으로 */
+const BR = [[0, 8, 16, 24, 32, 40, 48, 56, 64, 80, 96, 112, 128, 144, 160], [0, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320]];
+const HZ = { 3: [44100, 48000, 32000], 2: [22050, 24000, 16000], 0: [11025, 12000, 8000] };
+function mp3Frames(buf) {
+  const d = new Uint8Array(buf);
+  let i = 0, end = d.length;
+  if (d[0] === 0x49 && d[1] === 0x44 && d[2] === 0x33 && end > 10) i = 10 + ((d[6] & 0x7f) << 21 | (d[7] & 0x7f) << 14 | (d[8] & 0x7f) << 7 | (d[9] & 0x7f));
+  if (end >= 128 && d[end - 128] === 0x54 && d[end - 127] === 0x41 && d[end - 126] === 0x47) end -= 128;
+  const frames = [];
+  let info = null;
+  while (i + 4 <= end) {
+    const b1 = d[i + 1], b2 = d[i + 2], b3 = d[i + 3];
+    const ver = (b1 >> 3) & 3, layer = (b1 >> 1) & 3, bri = b2 >> 4, sri = (b2 >> 2) & 3;
+    if (d[i] !== 0xff || (b1 & 0xe0) !== 0xe0 || ver === 1 || layer !== 1 || bri === 0 || bri === 15 || sri === 3) { i++; continue; }
+    const mpeg1 = ver === 3, rate = HZ[ver][sri];
+    const size = Math.floor((mpeg1 ? 144 : 72) * BR[mpeg1 ? 1 : 0][bri] * 1000 / rate) + ((b2 >> 1) & 1);
+    if (i + size > end) break;
+    const mono = (b3 >> 6) === 3, side = mpeg1 ? (mono ? 17 : 32) : (mono ? 9 : 17), at = i + 4 + side + ((b1 & 1) ? 0 : 2);
+    const tag = String.fromCharCode(d[at], d[at + 1], d[at + 2], d[at + 3]);
+    const vbri = String.fromCharCode(d[i + 36], d[i + 37], d[i + 38], d[i + 39]);
+    if (tag !== 'Xing' && tag !== 'Info' && vbri !== 'VBRI') {
+      frames.push(d.subarray(i, i + size));
+      if (!info) info = { rate, spf: mpeg1 ? 1152 : 576, header: d.slice(i, i + 4) };
+    }
+    i += size;
+  }
+  return { frames, info };
+}
+function silentFrame(h) {
+  const b1 = h[1] | 1, b2 = h[2] & 0xfd, ver = (b1 >> 3) & 3, mpeg1 = ver === 3, rate = HZ[ver][(b2 >> 2) & 3];
+  const f = new Uint8Array(Math.floor((mpeg1 ? 144 : 72) * BR[mpeg1 ? 1 : 0][b2 >> 4] * 1000 / rate));
+  f[0] = h[0]; f[1] = b1; f[2] = b2; f[3] = h[3];
+  return f;
+}
+function assemble(parts) {
+  const pieces = [], starts = [];
+  let t = 0, silence = null, fmt = { rate: SR, spf: 576 }, total = 0;
+  for (const { mp3, pause } of parts) {
+    const { frames, info } = mp3Frames(mp3);
+    starts.push(t);
+    if (info) {
+      if (!silence) { silence = silentFrame(info.header); fmt = info; }
+      for (const f of frames) { pieces.push(f); total += f.length; }
+      t += frames.length * info.spf / info.rate;
+    }
+    if (silence) {
+      const n = Math.round(Math.max(pause, MIN_GAP) * fmt.rate / fmt.spf);
+      for (let k = 0; k < n; k++) { pieces.push(silence); total += silence.length; }
+      t += n * fmt.spf / fmt.rate;
+    }
+  }
+  const out = new Uint8Array(total);
+  let o = 0;
+  for (const p of pieces) { out.set(p, o); o += p.length; }
+  return { blob: new Blob([out], { type: 'audio/mpeg' }), starts, duration: t };
+}
+
+async function prepareAudio(keepOld) {
+  const token = ++renderToken;
+  const plan = S.session;
+  if (!sessionUsable(plan)) { detach(); ui = { phase: 'empty' }; renderDeck(); return; }
+  if (!keepOld || !TL || TL.sid !== plan.id) detach();
+  const segs = keyed(buildScript(plan));
+  ui = { phase: 'rendering', step: '', secs: 0 };
+  renderDeck();
+  try {
+    const have = await ensureClips(segs, nextPreviewSegs(), () => token === renderToken, (step, secs) => {
+      if (token !== renderToken) return;
+      ui.step = step; ui.secs = secs; renderDeck();
+    });
+    if (token !== renderToken) return;
+    const { blob, starts, duration } = assemble(segs.map((s) => ({ mp3: have.get(s.key).mp3, pause: s.p })));
+    const key = hash53(segs.map((s) => `${s.key}#${s.p}`).join('\n'));
+    attach(blob, segs, { key, starts, duration }, plan);
+    setTimeout(() => warmNext(token), 2000);
+  } catch (e) {
+    if (token !== renderToken || e.kind === 'stale') return;
+    ui = { phase: 'error', error: e.message || String(e), kind: e.kind || '' };
+    renderDeck();
+    if (TL) toast(ui.error, true);
+  }
+}
+
+// 다음 세션 문장이 빠져 있으면 뒤에서 미리 요청 (보통은 위 요청에 이미 포함)
+let warming = false;
+async function warmNext(token) {
+  if (token !== renderToken || !ghGet() || !navigator.onLine || !S.session) return;
+  try {
+    const segs = nextPreviewSegs();
+    const have = await clipsGet([...new Set(segs.map((s) => s.key))]);
+    if (!uniqueMissing(segs, have).length) return;
+    warming = true;
+    await ensureClips(segs, null, () => token === renderToken, () => {});
+  } catch { /* 다음 기회에 */ } finally { warming = false; }
+}
+
+function detach() {
+  if (!TL) return;
+  audio.pause();
+  URL.revokeObjectURL(TL.url);
+  audio.removeAttribute('src');
+  audio.load();
+  TL = null; lastCid = undefined;
+}
+
+function attach(blob, segs, st, plan) {
+  const wasPlaying = TL && !audio.paused;
+  const keepRound = TL && TL.sid === plan.id ? roundAt(audio.currentTime) : null;
+  const oldUrl = TL ? TL.url : null;
+  segs.forEach((s, i) => { s.start = st.starts[i] || 0; });
+  const marks = [];
+  segs.forEach((s, i) => { if (!i || s.item !== segs[i - 1].item) marks.push(s.start); });
+  const roundStart = [], roundEnd = [];
+  plan.rounds.forEach((_, r) => {
+    const first = segs.find((s) => s.round === r), after = segs.find((s) => s.round > r);
+    roundStart[r] = first ? first.start : after ? after.start : st.duration;
+    roundEnd[r] = after ? after.start : st.duration;
+  });
+  roundStart[0] = 0;
+  TL = { url: URL.createObjectURL(blob), key: st.key, sid: plan.id, segs, marks, roundStart, roundEnd, duration: st.duration };
+
+  let t0 = 0;
+  const pos = lsGet(K_POS);
+  if (!plan.completed) {
+    if (keepRound != null) t0 = roundStart[keepRound] || 0;
+    else if (pos && pos.sid === plan.id) t0 = pos.key === st.key ? Math.max(0, pos.t - 2) : roundStart[pos.round] || 0;
+  }
+  pendingSeek = t0 > 0.5 ? t0 : null;
+  audio.src = TL.url;
+  if (oldUrl) setTimeout(() => URL.revokeObjectURL(oldUrl), 2000);
+  ui = { phase: 'ready' };
+  const link = $('#save');
+  link.href = TL.url;
+  link.download = `commute-coach-${plan.created}-${Math.round(st.duration / 60)}min.mp3`;
+  link.setAttribute('aria-disabled', 'false');
+  renderDeck(); renderRoute(); onTime();
+  if (wasPlaying) audio.play().catch(() => {});
+}
+
+/* ───────── 재생 ───────── */
+function segIndexAt(t) {
+  const s = TL.segs;
+  let lo = 0, hi = s.length - 1;
+  while (lo < hi) { const mid = (lo + hi + 1) >> 1; if (s[mid].start <= t + 0.01) lo = mid; else hi = mid - 1; }
+  return lo;
+}
+const roundAt = (t) => clamp(TL.segs[segIndexAt(t)].round, 0, Math.max(0, S.session.rounds.length - 1));
+const curTime = () => (pendingSeek != null && audio.currentTime < 0.5 ? pendingSeek : audio.currentTime);
+
+function togglePlay() {
+  if (!TL) return;
+  if (!audio.paused) { audio.pause(); return; }
+  if (audio.ended || audio.currentTime >= TL.duration - 0.3) audio.currentTime = 0;
+  if (pendingSeek != null) { try { audio.currentTime = pendingSeek; } catch { /* 메타데이터 전 */ } }
+  audio.play().then(() => {
+    if (pendingSeek != null && Math.abs(audio.currentTime - pendingSeek) > 1) audio.currentTime = pendingSeek;
+    pendingSeek = null;
+  }).catch((e) => toast(`재생을 시작하지 못했어요: ${e.message}`, true));
+}
+
+function jump(dir) {
+  if (!TL) return;
+  const t = curTime(), m = TL.marks;
+  let i = 0;
+  while (i + 1 < m.length && m[i + 1] <= t + 0.05) i++;
+  const target = dir < 0 ? (t - m[i] > 2.5 || i === 0 ? m[i] : m[i - 1]) : i + 1 < m.length ? m[i + 1] : TL.duration - 0.1;
+  pendingSeek = null;
+  audio.currentTime = Math.max(0, target);
+  onTime();
+}
+
+function creditUpTo(t) {
+  const plan = S.session;
+  if (!TL || !plan || TL.sid !== plan.id) return;
+  const today = todayStr();
+  let changed = false;
+  plan.rounds.forEach((ids, r) => {
+    if (plan.credited.includes(r) || t < TL.roundEnd[r] - 0.3) return;
+    plan.credited.push(r); changed = true;
+    for (const id of ids) {
+      const p = S.progress[id];
+      if (!p || !p.n) S.progress[id] = { n: 1, last: today };
+      else if (p.last !== today || p.due) S.progress[id] = { n: p.n + (p.last !== today ? 1 : 0), last: today };   // 같은 날 반복은 한 번만
+    }
+  });
+  if (!plan.completed && plan.credited.length >= plan.rounds.length) { plan.completed = true; changed = true; }
+  if (changed) { save(); renderSession(); renderStats(); }
+}
+
+function savePos() {
+  if (!TL) return;
+  lastPosSave = Date.now();
+  const t = audio.currentTime;
+  lsSet(K_POS, { sid: TL.sid, key: TL.key, t, round: roundAt(t) });
+}
+
+function onTime() {
+  if (!TL) return;
+  const t = curTime();
+  const i = segIndexAt(t), seg = TL.segs[i];
+  $('#cur').textContent = mmss(t);
+  const pct = TL.duration ? clamp(t / TL.duration, 0, 1) * 100 : 0;
+  $('#fill').style.width = `${pct}%`;
+  $('#car').style.left = `${pct}%`;
+  const seek = $('#seek');
+  if (document.activeElement !== seek) seek.value = t;
+  // 지금 문장의 청크 (안내 멘트 중이면 바로 다음 청크)
+  let c = seg.cid ? byId(seg.cid) : null;
+  for (let j = i + 1; !c && j < TL.segs.length; j++) if (TL.segs[j].cid) c = byId(TL.segs[j].cid);
+  if (S.session.completed && t >= TL.duration - 0.6) setNow('수고하셨어요', '이번 세션을 끝까지 들었어요. ▶를 누르면 처음부터 다시 들어요.');
+  else if (t > 0.5 || !audio.paused) setNow(c ? c.chunk : '수고하셨어요', seg.t);
+  const metaKey = `${c ? c.id : ''}|${roundAt(t)}`;
+  if (metaKey !== lastCid) { lastCid = metaKey; updateMediaMeta(c, t); }
+  if (!audio.paused) { creditUpTo(t); if (Date.now() - lastPosSave > 3000) savePos(); }
+  renderStatus();
+}
+
+/* 잠금화면 · 자동차 핸들 버튼 */
+function setupMediaSession() {
+  if (!('mediaSession' in navigator)) return;
+  const on = (a, f) => { try { navigator.mediaSession.setActionHandler(a, f); } catch { /* 지원 안 함 */ } };
+  on('play', () => { if (audio.paused) togglePlay(); });
+  on('pause', () => audio.pause());
+  on('previoustrack', () => jump(-1));
+  on('nexttrack', () => jump(1));
+  on('seekto', (d) => { if (TL && d.seekTime != null) { pendingSeek = null; audio.currentTime = d.seekTime; onTime(); } });
+}
+function updateMediaMeta(c, t) {
+  if (!('mediaSession' in navigator) || typeof MediaMetadata === 'undefined' || !TL) return;
+  try {
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: c ? c.chunk : 'Commute Coach',
+      artist: c ? c.meaning_ko : '출퇴근 청크 영어',
+      album: `${roundAt(t) + 1}세트 / ${S.session.rounds.length}세트`,
+      artwork: [{ src: iconUrl, sizes: '512x512', type: 'image/png' }],
+    });
+  } catch { /* 무시 */ }
+}
+
+/* ───────── 화면 ───────── */
+function setNow(en, ko) { $('#nowEn').textContent = en; $('#nowKo').textContent = ko; }
+
+function renderStats() {
+  const today = todayStr();
+  const waiting = S.chunks.filter((c) => { const p = prog(c); return !p || !p.n || p.due || (p.last !== today && dueDate(p) <= today); }).length;
+  $('#stats').textContent = S.chunks.length ? `청크 ${S.chunks.length}개, 복습할 차례 ${waiting}개` : '';
+}
+
+function renderStatus() {
+  const plan = S.session;
+  let text = '';
+  if (ui.phase === 'loading') text = '불러오는 중';
+  else if (ui.phase === 'empty') text = '청크가 아직 없어요';
+  else if (ui.phase === 'error' && ui.kind === 'setup' && !TL) text = '처음 한 번 GitHub 연결이 필요해요';
+  else if (ui.phase === 'error') text = TL ? '새 음성을 만들지 못했어요. 지금 음성은 그대로 들을 수 있어요.' : '음성을 준비하지 못했어요';
+  else if (ui.phase === 'rendering') {
+    const t = ui.secs ? ` ${mmss(ui.secs)}` : '';
+    if (!ui.step) text = '세션 준비 중';
+    else if (ui.step === 'send') text = 'GitHub에 요청 보내는 중';
+    else if (TL) text = `바뀐 설정으로 다시 만드는 중${t}`;
+    else if (ui.step === 'in_progress') text = `GitHub에서 새 문장 음성 만드는 중${t}`;
+    else text = `GitHub 작업 준비 중${t}`;
+  } else if (TL && plan) {
+    const t = curTime();
+    const where = `${roundAt(t) + 1}세트 / ${plan.rounds.length}세트`;
+    if (plan.completed && (audio.ended || t >= TL.duration - 0.5 || t < 0.5)) text = '세션 완료. 새 세션을 만들거나 다시 들을 수 있어요.';
+    else if (!audio.paused) text = where;
+    else if (t > 0.5) text = `이어 듣기 준비 완료, ${where}`;
+    else text = `${Math.max(1, Math.round(TL.duration / 60))}분 세션 준비 완료`;
+  }
+  $('#status').textContent = text;
+}
+
+function renderDeck() {
+  const ready = !!TL;
+  $('#play').disabled = !ready;
+  $('#prev').disabled = !ready;
+  $('#next').disabled = !ready;
+  $('#newSession').disabled = !S.chunks.length;
+  $('#dur').textContent = ready ? mmss(TL.duration) : '0:00';
+  $('#route').hidden = !ready;
+  $('.times').hidden = !ready;
+  if (!ready) {
+    $('#save').setAttribute('aria-disabled', 'true');
+    $('#save').removeAttribute('href');
+    $('#cur').textContent = '0:00';
+    $('#fill').style.width = '0';
+    $('#car').style.left = '0';
+  }
+  $('#meter').hidden = ui.phase !== 'rendering' || ready;
+  $('#meterFill').style.width = ui.step ? `${Math.min(92, 6 + (ui.secs || 0) * 0.9)}%` : '6%';
+  const keyProblem = ui.phase === 'error' && ui.kind === 'setup';
+  $('#retry').hidden = ui.phase !== 'error' || keyProblem;
+  $('#openVoice').hidden = !keyProblem;
+
+  const plan = S.session;
+  if (ui.phase === 'empty') setNow('수업 내용을 추가해 주세요', '아래 ‘수업 내용 추가’에서 Claude가 만든 JSON을 붙여넣으면 바로 세션이 만들어져요.');
+  else if (ui.phase === 'error' && !ready) setNow('', ui.error);
+  else if (ui.phase === 'rendering' && !ready) setNow('', ui.step ? '처음 나오는 문장만 GitHub에서 만들어요 (보통 1~2분). 화면을 꺼도 계속 만들어지고, 다시 열면 이어서 받아요.' : '');
+  else if (ready && plan && !(curTime() > 0.5 || !audio.paused)) {
+    if (plan.completed) setNow('수고하셨어요', '이번 세션을 끝까지 들었어요.');
+    else { const c = byId((plan.rounds.flat())[0]); setNow(c ? c.chunk : '', c ? c.meaning_ko : ''); }
+  }
+  setPlayIcon();
+  renderStatus();
+}
+
+function renderRoute() {
+  const stops = $('#stops');
+  const seek = $('#seek');
+  if (!TL) { stops.innerHTML = ''; seek.max = 1; seek.disabled = true; return; }
+  seek.disabled = false;
+  seek.max = TL.duration;
+  const plan = S.session;
+  stops.innerHTML = TL.roundStart.map((t, r) => `<span class="stop${plan.credited.includes(r) ? ' done' : ''}" style="left:${(t / TL.duration) * 100}%"></span>`).join('')
+    + `<span class="stop${plan.completed ? ' done' : ''}" style="left:100%"></span>`;
+}
+
+function setPlayIcon() {
+  const playing = TL && !audio.paused;
+  $('#playIcon').setAttribute('d', playing ? 'M7 5h3.6v14H7zM13.4 5H17v14h-3.6z' : 'M8.5 5.5v13L19 12z');
+  $('#play').setAttribute('aria-label', playing ? '일시정지' : '재생');
+}
+
+function renderSession() {
+  const plan = S.session;
+  const sec = $('#sessionSec');
+  if (!sessionUsable(plan)) { sec.hidden = true; return; }
+  sec.hidden = false;
+  $('#sets').innerHTML = plan.rounds.map((ids, r) => {
+    const cs = ids.map(byId).filter(Boolean);
+    if (!cs.length) return '';
+    const done = plan.credited.includes(r);
+    return `<li><div class="set-name">${r + 1}세트${done ? '<span class="tick" aria-label="완료">✓ 완료</span>' : ''}</div><ul class="items">${
+      cs.map((c) => `<li><span class="en">${esc(c.chunk)}</span><span class="ko">${esc(c.meaning_ko)}</span>${plan.fresh.includes(c.id) ? '<em class="tag">새 표현</em>' : ''}</li>`).join('')}</ul></li>`;
+  }).join('');
+  if (TL) renderRoute();
+}
+
+function renderLibrary() {
+  $('#libCount').textContent = S.chunks.length ? `${S.chunks.length}개` : '';
+  if (!$('#libSec').open) return;
+  const today = todayStr();
+  const list = [...S.chunks].sort((a, b) => (b.added || '').localeCompare(a.added || '') || (b.lesson_date || '').localeCompare(a.lesson_date || ''));
+  $('#lib').innerHTML = list.length ? list.map((c) => {
+    const p = prog(c);
+    const due = p && p.n ? dueDate(p) : '';
+    const meta = !p || !p.n ? '아직 안 들음' : `${p.n}번 들음, ${due <= today ? '복습할 차례' : `다음 복습 ${shortDate(due)}`}`;
+    return `<li><span class="en">${esc(c.chunk)}</span><span class="ko">${esc(c.meaning_ko)}</span><span class="meta">${esc(meta)}${c.sample ? ', 샘플' : ''}${c.topic ? `, ${esc(c.topic)}` : ''}</span><button class="del" data-id="${esc(c.id)}">삭제</button></li>`;
+  }).join('') : '<li><span class="ko">아직 청크가 없어요.</span></li>';
+}
+
+function renderSettings() {
+  const st = S.settings;
+  $('#lenChips').innerHTML = LENGTHS.map((m) => `<button class="chip" data-len="${m}" aria-pressed="${st.minutes === m}">${m}</button>`).join('');
+  $('#rateChips').innerHTML = RATES.map((r) => `<button class="chip" data-rate="${r}" aria-pressed="${Math.abs(st.rate - r) < 0.01}">${r.toFixed(1)}×</button>`).join('');
+  $('#pauseSliders').innerHTML = PAUSES.map(([k, label, lo, hi]) =>
+    `<label class="slider"><span>${label}<b id="v-${k}">${st[k]}초</b></span><input type="range" min="${lo}" max="${hi}" step="1" value="${st[k]}" data-pause="${k}"></label>`).join('');
+  renderVoiceState();
+  const old = S.lastBackup && S.lastBackup < addDays(todayStr(), -14);
+  $('#backupHint').textContent = ghGet()
+    ? '학습 기록은 GitHub(coach-data)에 자동으로 백업돼요. 다른 기기에서 열어도 같은 기록이 이어져요.'
+    : '학습 기록은 아직 이 아이폰에만 있어요. GitHub를 연결하면 자동으로 백업돼요. '
+      + (S.lastBackup ? `마지막 백업 파일 ${shortDate(S.lastBackup)}${old ? ', 2주가 넘었어요.' : '.'}` : '');
+}
+
+function renderVoiceState() {
+  const g = ghGet();
+  const el = $('#voiceState');
+  el.textContent = g ? `연결됨 (${g.repo})` : '아직 연결 안 됨. 처음 한 번만 하면 돼요.';
+  el.className = `voice-state${g ? ' ok' : ''}`;
+  if (g && document.activeElement !== $('#ghRepo')) $('#ghRepo').value = g.repo;
+}
+
+function renderAll() { renderStats(); renderDeck(); renderRoute(); renderSession(); renderLibrary(); renderSettings(); }
+
+let toastTimer = null;
+function toast(msg, err = false) {
+  const el = $('#toast');
+  el.textContent = msg;
+  el.className = `toast show${err ? ' err' : ''}`;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { el.className = `toast${err ? ' err' : ''}`; }, err ? 6500 : 4000);
+}
+
+/* ───────── 복사 · 내려받기 ───────── */
+function copyText(text) {
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(text).catch(() => {});
+    return true;
+  }
+  const span = document.createElement('span');
+  span.textContent = text;
+  Object.assign(span.style, { whiteSpace: 'pre', position: 'fixed', top: '0', clip: 'rect(0,0,0,0)', webkitUserSelect: 'text', userSelect: 'text' });
+  document.body.appendChild(span);
+  const range = document.createRange();
+  range.selectNodeContents(span);
+  const sel = window.getSelection();
+  sel.removeAllRanges(); sel.addRange(range);
+  let ok = false;
+  try { ok = document.execCommand('copy'); } catch { ok = false; }
+  sel.removeAllRanges(); span.remove();
+  return ok;
+}
+
+function downloadBlob(blob, name) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+}
+
+/* ───────── GitHub 연결 저장 · 확인 ───────── */
+let syncing = false, syncAgain = false, stateSha = null;
+async function syncState(strict = false) {
+  const cfg = ghGet();
+  if (!cfg || !navigator.onLine) return;
+  if (syncing) { syncAgain = true; return; }
+  syncing = true;
+  let conflicts = 0;
+  try {
+    do {
+      syncAgain = false;
+      const remote = await fetchRemoteState(cfg);
+      if (remote) mergeIntoLocal(remote);
+      if (remote && !lsGet(K_DIRTY) && canon(normalizeState(remote)) === canon(S)) continue;   // 보낼 게 없음
+      try {
+        const res = await gh('/contents/state.json', { method: 'PUT', cfg,
+          body: { message: '학습 기록 백업', content: b64encode(JSON.stringify(S)), ...(stateSha ? { sha: stateSha } : {}) } });
+        if (!res) throw fail('토큰 권한이 부족해요 (404). README의 토큰 권한을 확인해 주세요.', 'perm');
+        stateSha = res.content ? res.content.sha : null;
+        if (!syncAgain) lsSet(K_DIRTY, false);
+      } catch (e) {
+        if (e.kind === 'conflict' && ++conflicts < 4) { syncAgain = true; continue; }   // 다른 기기가 먼저 저장 → 다시 받아 합치기
+        throw e;
+      }
+    } while (syncAgain);
+  } catch (e) {
+    if (strict) throw e;
+  } finally {
+    syncing = false;
+  }
+}
+async function fetchRemoteState(cfg) {
+  const meta = await gh('/contents/state.json', { cfg });
+  if (!meta) { stateSha = null; return null; }
+  stateSha = meta.sha;
+  const text = meta.content ? new TextDecoder().decode(b64bytes(meta.content)) : await gh('/contents/state.json', { raw: true, cfg });
+  try { return JSON.parse(text); } catch { return null; }
+}
+
+async function saveGitHub() {
+  const prev = lsGet(K_GH) || {};
+  const repo = $('#ghRepo').value.trim().replace(/^https?:\/\/github\.com\//i, '').replace(/\.git$/i, '').replace(/\/+$/, '');
+  const token = $('#ghToken').value.trim() || (prev.repo === repo ? prev.token : '') || '';
+  if (!/^[\w.-]+\/[\w.-]+$/.test(repo)) { toast('저장소는 아이디/저장소이름 형식으로 넣어 주세요 (예: myid/coach-data).', true); return; }
+  if (!token) { toast('토큰을 붙여넣어 주세요.', true); $('#ghToken').focus(); return; }
+  const cfg = { repo, token };
+  const btn = $('#ghSave');
+  btn.disabled = true; btn.textContent = '확인 중…';
+  try {
+    const info = await gh('', { cfg });
+    if (!info) throw fail('저장소를 찾을 수 없어요. 이름이 맞는지, 토큰이 이 저장소에 접근할 수 있는지 확인해 주세요.', 'setup');
+    const wf = await gh('/contents/.github/workflows', { cfg });
+    if (!wf || !wf.length) {
+      // 앱과 함께 올린 tts.yml을 coach-data에 설치 (토큰에 Workflows 쓰기 권한 필요)
+      const r = await fetch('./tts.yml', { cache: 'no-store' }).catch(() => null);
+      const yml = r && r.ok ? await r.text() : '';
+      if (!yml.includes('edge-tts')) throw fail('앱 파일 중 tts.yml을 찾지 못했어요. coach 저장소에 tts.yml도 올렸는지 확인해 주세요.', 'setup');
+      try {
+        const put = await gh('/contents/.github/workflows/tts.yml', { method: 'PUT', cfg, body: { message: '음성 워크플로 설치', content: b64encode(yml) } });
+        if (!put) throw fail('not found', 'setup');
+      } catch (e) {
+        if (e.kind === 'perm' || e.kind === 'setup') throw fail('음성 워크플로를 설치하지 못했어요. 토큰에 Workflows 쓰기 권한을 주거나, README대로 tts.yml을 직접 추가해 주세요.', 'setup');
+        throw e;
+      }
+    }
+    lsSet(K_GH, cfg);
+    try { await syncState(true); } catch (e) {
+      lsSet(K_GH, prev.repo ? prev : null);
+      throw e.kind === 'perm' ? fail('토큰에 Contents 쓰기 권한이 없어요. 토큰 권한에서 Contents를 Read and write로 바꿔 주세요.', 'setup') : e;
+    }
+    $('#ghToken').value = '';
+    renderAll();
+    toast(info.private ? 'GitHub 연결 완료! 이제 음성을 만들 수 있어요.' : 'GitHub 연결 완료. 다만 공개 저장소예요. 수업 문장이 보이지 않게 비공개로 바꾸는 걸 권장해요.');
+    if (!TL || ui.phase === 'error') prepareAudio(false);
+  } catch (e) {
+    toast(e.message || String(e), true);
+  } finally {
+    btn.disabled = false; btn.textContent = '저장하고 확인';
+  }
+}
+
+/* ───────── 이벤트 ───────── */
+let rerenderTimer = null;
+function settingsChanged(newPlan) {
+  S.settingsAt = Date.now();
+  save(); renderSettings();
+  clearTimeout(rerenderTimer);
+  if (newPlan) newSession();
+  else rerenderTimer = setTimeout(() => prepareAudio(true), 700);
+}
+
+function openVoiceSettings() {
+  $('#setSec').open = true;
+  renderSettings();
+  $('#voiceField').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  setTimeout(() => (ghGet() ? $('#ghToken') : $('#ghRepo')).focus(), 400);
+}
+
+function bind() {
+  $('#play').addEventListener('click', togglePlay);
+  $('#prev').addEventListener('click', () => jump(-1));
+  $('#next').addEventListener('click', () => jump(1));
+  $('#retry').addEventListener('click', () => { if (!sessionUsable(S.session) || S.session.completed) newSession(); else prepareAudio(true); });
+  $('#openVoice').addEventListener('click', openVoiceSettings);
+  $('#newSession').addEventListener('click', () => { newSession(); toast('새 세션을 만들고 있어요.'); });
+  $('#seek').addEventListener('input', (e) => { if (!TL) return; pendingSeek = null; audio.currentTime = Number(e.target.value); onTime(); });
+
+  audio.addEventListener('loadedmetadata', () => { if (pendingSeek != null) { try { audio.currentTime = pendingSeek; } catch { /* 재생 시 다시 */ } } onTime(); });
+  audio.addEventListener('timeupdate', onTime);
+  audio.addEventListener('play', () => { setPlayIcon(); onTime(); if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing'; });
+  audio.addEventListener('pause', () => { setPlayIcon(); savePos(); renderStatus(); if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused'; });
+  audio.addEventListener('ended', () => {
+    creditUpTo(Infinity);
+    lsSet(K_POS, null);
+    setPlayIcon(); renderDeck(); renderRoute();
+  });
+  audio.addEventListener('error', () => { if (TL) toast('오디오를 재생할 수 없어요. 새 세션을 만들어 보세요.', true); });
+
+  $('#copyPrompt').addEventListener('click', () => {
+    if (!PROMPT) { toast('프롬프트를 불러오지 못했어요. 페이지를 새로 고쳐 주세요.', true); return; }
+    if (copyText(PROMPT)) { toast('프롬프트를 복사했어요. Claude에 붙여넣고 수업 녹취를 첨부하세요.'); $('#promptBox').hidden = true; }
+    else { $('#promptText').value = PROMPT; $('#promptBox').hidden = false; $('#promptText').select(); }
+  });
+  $('#addBtn').addEventListener('click', () => runImport($('#jsonIn').value));
+  $('#fileIn').addEventListener('change', async (e) => {
+    const f = e.target.files && e.target.files[0];
+    if (f) runImport(await f.text());
+    e.target.value = '';
+  });
+
+  $('#libSec').addEventListener('toggle', renderLibrary);
+  $('#lib').addEventListener('click', (e) => {
+    const b = e.target.closest('.del');
+    if (!b) return;
+    if (!b.classList.contains('armed')) {
+      b.classList.add('armed'); b.textContent = '정말 삭제';
+      setTimeout(() => { if (b.isConnected) { b.classList.remove('armed'); b.textContent = '삭제'; } }, 3000);
+      return;
+    }
+    const c = byId(b.dataset.id);
+    S.chunks = S.chunks.filter((x) => x.id !== b.dataset.id);
+    delete S.progress[b.dataset.id];
+    S.deleted[b.dataset.id] = todayStr();
+    save(); renderStats(); renderLibrary(); renderSession();
+    toast(`‘${c ? c.chunk : '청크'}’를 삭제했어요.`);
+  });
+
+  $('#ghSave').addEventListener('click', saveGitHub);
+  $('#setSec').addEventListener('click', (e) => {
+    const len = e.target.closest('[data-len]'), rate = e.target.closest('[data-rate]');
+    if (len && Number(len.dataset.len) !== S.settings.minutes) { S.settings.minutes = Number(len.dataset.len); settingsChanged(true); }
+    if (rate && Math.abs(Number(rate.dataset.rate) - S.settings.rate) > 0.01) { S.settings.rate = Number(rate.dataset.rate); settingsChanged(false); }
+  });
+  $('#pauseSliders').addEventListener('input', (e) => {
+    const k = e.target.dataset.pause;
+    if (k) $(`#v-${k}`).textContent = `${e.target.value}초`;
+  });
+  $('#pauseSliders').addEventListener('change', (e) => {
+    const k = e.target.dataset.pause;
+    if (k) { S.settings[k] = Number(e.target.value); settingsChanged(false); }
+  });
+  $('#resetSettings').addEventListener('click', () => {
+    const minutes = S.settings.minutes;
+    S.settings = { ...DEFAULTS, minutes };
+    settingsChanged(false);
+    toast('생각할 시간과 속도를 기본값으로 되돌렸어요.');
+  });
+  $('#backup').addEventListener('click', () => {
+    S.lastBackup = todayStr();
+    save(); renderSettings();
+    downloadBlob(new Blob([JSON.stringify(S, null, 1)], { type: 'application/json' }), `commute-coach-backup-${todayStr()}.json`);
+  });
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') { if (TL) savePos(); if (lsGet(K_DIRTY)) syncState(); return; }
+    syncState();                                       // 다른 기기에서 바뀐 내용 받기 + 내 변경 보내기
+    if (ui.phase === 'error' && ui.kind !== 'setup' && navigator.onLine) prepareAudio(!!TL);
+  });
+  window.addEventListener('online', () => { syncState(); if (ui.phase === 'error' && ui.kind === 'net') prepareAudio(!!TL); });
+}
+
+function init() {
+  bind();
+  setupMediaSession();
+  loadState();
+  if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('./sw.js').catch(() => {});
+  if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
+  fetch('./prompt.txt').then((r) => (r.ok ? r.text() : '')).then((t) => { PROMPT = t; }).catch(() => {});
+  fetch('./icon.png').then((r) => (r.ok ? r.blob() : null)).then((b) => { if (b) iconUrl = URL.createObjectURL(b); }).catch(() => {});
+  const stale = S.session && S.session.created < addDays(todayStr(), -2);   // 며칠 묵은 세션은 새로 구성
+  if (!sessionUsable(S.session) || S.session.completed || stale || S.session.minutes !== S.settings.minutes) { S.session = buildPlan(); S.sessionAt = Date.now(); save(); }
+  renderAll();
+  prepareAudio(false);
+  syncState();
+  setTimeout(() => clipsGc(45).catch(() => {}), 8000);
+}
+init();
+</script>
+</body>
+</html>
